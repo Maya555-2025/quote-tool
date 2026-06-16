@@ -279,7 +279,7 @@
     </div>
     <div class="field-row three">
       <div class="field">
-        <label>未稅成本 (NTD)</label>
+        <label>未稅成本 (NTD，不含運費)</label>
         <input type="number" id="cost" step="0.1" />
       </div>
       <div class="field">
@@ -289,6 +289,73 @@
       <div class="field">
         <label>營業管銷率 %</label>
         <input type="number" id="opexRate" step="0.1" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <p class="card-label" style="margin:0;">運費分攤設定 — 忳重與實重取大者計費，分攤到每件商品成本</p>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); cursor:pointer; white-space:nowrap;">
+        <input type="checkbox" id="freightEnabled" style="width:auto; height:auto;" />啟用運費
+      </label>
+    </div>
+    <div id="freightFields" style="display:none;">
+      <div class="field-row three">
+        <div class="field">
+          <label>長 (cm)</label>
+          <input type="number" id="fLength" step="0.1" />
+        </div>
+        <div class="field">
+          <label>寬 (cm)</label>
+          <input type="number" id="fWidth" step="0.1" />
+        </div>
+        <div class="field">
+          <label>高 (cm)</label>
+          <input type="number" id="fHeight" step="0.1" />
+        </div>
+      </div>
+      <div class="field-row three">
+        <div class="field">
+          <label>單箱實重 (kg)</label>
+          <input type="number" id="fActualWeight" step="0.1" />
+        </div>
+        <div class="field">
+          <label>忳重係數 (常用6000)</label>
+          <input type="number" id="fDivisor" step="1" />
+        </div>
+        <div class="field">
+          <label>每箱裝箱數量</label>
+          <input type="number" id="fQtyPerBox" step="1" />
+        </div>
+      </div>
+      <div class="field-row three">
+        <div class="field">
+          <label>運費單價 (元/KG)</label>
+          <input type="number" id="fRate" step="0.01" />
+        </div>
+        <div class="field">
+          <label>幣別</label>
+          <input type="text" id="fCurrency" placeholder="例如 USD / CNY" />
+        </div>
+        <div class="field">
+          <label>匯率 (兌台幣)</label>
+          <input type="number" id="fExchangeRate" step="0.0001" />
+        </div>
+      </div>
+      <div class="metrics" style="margin-top:4px; margin-bottom:0;">
+        <div class="metric">
+          <p class="metric-label">忳重 (kg)</p>
+          <p class="metric-value" id="fVolWeightOut">0.0</p>
+        </div>
+        <div class="metric">
+          <p class="metric-label">計費重量 (kg)</p>
+          <p class="metric-value" id="fChargeWeightOut">0.0</p>
+        </div>
+        <div class="metric">
+          <p class="metric-label">單件運費 (NTD)</p>
+          <p class="metric-value" id="fPerUnitOut">0.0</p>
+        </div>
       </div>
     </div>
   </div>
@@ -337,6 +404,21 @@
     ];
   }
 
+  function defaultFreight(){
+    return {
+      enabled: false,
+      length: 0,
+      width: 0,
+      height: 0,
+      actualWeight: 0,
+      divisor: 6000,
+      qtyPerBox: 1,
+      rate: 0,
+      currency: 'USD',
+      exchangeRate: 31.5
+    };
+  }
+
   function defaultProduct(name, desc, cost){
     return {
       id: 'p' + Date.now() + Math.floor(Math.random()*1000),
@@ -345,6 +427,7 @@
       cost: cost != null ? cost : 1000,
       taxRate: 5,
       opexRate: 15,
+      freight: defaultFreight(),
       tiers: defaultTiers()
     };
   }
@@ -367,6 +450,7 @@
   var state = loadLocalState();
   var products = state.products;
   var currentId = state.currentId;
+  products.forEach(function(p){ if (!p.freight) p.freight = defaultFreight(); });
 
   function fmt(n){
     if (!isFinite(n)) return '0.0';
@@ -375,13 +459,30 @@
 
   function getCurrent(){
     var found = products.find(function(p){ return p.id === currentId; });
-    if (found) return found;
-    currentId = products[0].id;
-    return products[0];
+    if (!found) {
+      currentId = products[0].id;
+      found = products[0];
+    }
+    if (!found.freight) found.freight = defaultFreight();
+    return found;
+  }
+
+  function calcFreight(freight){
+    if (!freight || !freight.enabled) {
+      return { volWeight: 0, chargeWeight: 0, perUnitNTD: 0 };
+    }
+    var volWeight = freight.divisor > 0 ? (freight.length * freight.width * freight.height) / freight.divisor : 0;
+    var chargeWeight = Math.max(volWeight, freight.actualWeight || 0);
+    var totalForeign = chargeWeight * (freight.rate || 0);
+    var totalNTD = totalForeign * (freight.exchangeRate || 1);
+    var qty = freight.qtyPerBox > 0 ? freight.qtyPerBox : 1;
+    var perUnitNTD = totalNTD / qty;
+    return { volWeight: volWeight, chargeWeight: chargeWeight, perUnitNTD: perUnitNTD };
   }
 
   function calc(product){
-    var costUntaxed = product.cost;
+    var freightResult = calcFreight(product.freight);
+    var costUntaxed = product.cost + freightResult.perUnitNTD;
     var costTaxed = costUntaxed * (1 + product.taxRate/100);
     var opexTotal = costTaxed * (product.opexRate/100);
     var baseUntaxed = costUntaxed + opexTotal / (1 + product.taxRate/100);
@@ -409,7 +510,7 @@
       prevUntaxed = thisUntaxed;
     });
 
-    return { costUntaxed: costUntaxed, costTaxed: costTaxed, opexTotal: opexTotal, baseUntaxed: baseUntaxed, rows: rows };
+    return { costUntaxed: costUntaxed, costTaxed: costTaxed, opexTotal: opexTotal, baseUntaxed: baseUntaxed, rows: rows, freight: freightResult };
   }
 
   function renderProductSelect(){
@@ -431,6 +532,31 @@
     document.getElementById('cost').value = p.cost;
     document.getElementById('taxRate').value = p.taxRate;
     document.getElementById('opexRate').value = p.opexRate;
+    renderFreightFields();
+  }
+
+  function renderFreightFields(){
+    var f = getCurrent().freight;
+    document.getElementById('freightEnabled').checked = f.enabled;
+    document.getElementById('freightFields').style.display = f.enabled ? 'block' : 'none';
+    document.getElementById('fLength').value = f.length;
+    document.getElementById('fWidth').value = f.width;
+    document.getElementById('fHeight').value = f.height;
+    document.getElementById('fActualWeight').value = f.actualWeight;
+    document.getElementById('fDivisor').value = f.divisor;
+    document.getElementById('fQtyPerBox').value = f.qtyPerBox;
+    document.getElementById('fRate').value = f.rate;
+    document.getElementById('fCurrency').value = f.currency;
+    document.getElementById('fExchangeRate').value = f.exchangeRate;
+    renderFreightOutputs();
+  }
+
+  function renderFreightOutputs(){
+    var f = getCurrent().freight;
+    var r = calcFreight(f);
+    document.getElementById('fVolWeightOut').textContent = r.volWeight.toFixed(1);
+    document.getElementById('fChargeWeightOut').textContent = r.chargeWeight.toFixed(1);
+    document.getElementById('fPerUnitOut').textContent = 'NT$' + fmt(r.perUnitNTD);
   }
 
   function renderTiers(){
@@ -501,8 +627,8 @@
       d.innerHTML = '<p class="metric-label">' + label + '</p><p class="metric-value">' + value + '</p>';
       return d;
     }
-    metrics.appendChild(metricCard('未稅成本', 'NT$' + fmt(c.costUntaxed)));
-    metrics.appendChild(metricCard('含稅成本', 'NT$' + fmt(c.costTaxed)));
+    metrics.appendChild(metricCard('未稅成本(含運費)', 'NT$' + fmt(c.costUntaxed)));
+    metrics.appendChild(metricCard('含稅成本(含運費)', 'NT$' + fmt(c.costTaxed)));
     metrics.appendChild(metricCard('管銷後底價(未稅)', 'NT$' + fmt(c.baseUntaxed)));
     wrap.appendChild(metrics);
 
@@ -532,6 +658,9 @@
     renderTiers();
     renderResults();
   }
+  function ensureFreightDefaults(){
+    products.forEach(function(p){ if (!p.freight) p.freight = defaultFreight(); });
+  }
 
   function flashSaved(text){
     var ind = document.getElementById('saveIndicator');
@@ -559,6 +688,29 @@
   document.getElementById('cost').addEventListener('input', function(e){ getCurrent().cost = parseFloat(e.target.value) || 0; renderResults(); persist(); });
   document.getElementById('taxRate').addEventListener('input', function(e){ getCurrent().taxRate = parseFloat(e.target.value) || 0; renderResults(); persist(); });
   document.getElementById('opexRate').addEventListener('input', function(e){ getCurrent().opexRate = parseFloat(e.target.value) || 0; renderResults(); persist(); });
+
+  document.getElementById('freightEnabled').addEventListener('change', function(e){
+    getCurrent().freight.enabled = e.target.checked;
+    document.getElementById('freightFields').style.display = e.target.checked ? 'block' : 'none';
+    renderResults(); persist();
+  });
+  function bindFreightField(id, key, isText){
+    document.getElementById(id).addEventListener('input', function(e){
+      getCurrent().freight[key] = isText ? e.target.value : (parseFloat(e.target.value) || 0);
+      renderFreightOutputs();
+      renderResults();
+      persist();
+    });
+  }
+  bindFreightField('fLength', 'length');
+  bindFreightField('fWidth', 'width');
+  bindFreightField('fHeight', 'height');
+  bindFreightField('fActualWeight', 'actualWeight');
+  bindFreightField('fDivisor', 'divisor');
+  bindFreightField('fQtyPerBox', 'qtyPerBox');
+  bindFreightField('fRate', 'rate');
+  bindFreightField('fCurrency', 'currency', true);
+  bindFreightField('fExchangeRate', 'exchangeRate');
 
   document.getElementById('addTierBtn').addEventListener('click', function(){
     getCurrent().tiers.push({id:'t'+Date.now(), name:'新層級', mode:'gross', rate:15, taxRate:5});
@@ -593,8 +745,16 @@
     var lines = [];
     lines.push('產品型號,' + p.name);
     lines.push('產品名稱,' + p.desc);
-    lines.push('未稅成本,' + fmt(c.costUntaxed));
-    lines.push('含稅成本,' + fmt(c.costTaxed));
+    if (p.freight.enabled) {
+      lines.push('');
+      lines.push('運費明細');
+      lines.push('忳重(kg),' + c.freight.volWeight.toFixed(1));
+      lines.push('計費重量(kg),' + c.freight.chargeWeight.toFixed(1));
+      lines.push('單件運費(NTD),' + fmt(c.freight.perUnitNTD));
+    }
+    lines.push('');
+    lines.push('未稅成本(含運費),' + fmt(c.costUntaxed));
+    lines.push('含稅成本(含運費),' + fmt(c.costTaxed));
     lines.push('營業管銷率,' + p.opexRate + '%');
     lines.push('管銷後底價(未稅),' + fmt(c.baseUntaxed));
     lines.push('');
@@ -622,6 +782,7 @@
           if (confirm('匯入將覆蓋目前所有商品資料，確定要繼續嗎？')) {
             products = data.products;
             currentId = data.currentId || products[0].id;
+            ensureFreightDefaults();
             render(); persist();
           }
         } else { alert('檔案格式不正確'); }
@@ -771,6 +932,7 @@
             suppressDriveSave = true;
             products = data.products;
             currentId = data.currentId || products[0].id;
+            ensureFreightDefaults();
             try {
               localStorage.setItem(STORE_KEY, JSON.stringify(products));
               localStorage.setItem(CURRENT_KEY, currentId);
