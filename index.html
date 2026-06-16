@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>報價試算工具</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#FAF9F6;
+    --surface:#FFFFFF;
+    --surface-2:#F1EFE8;
+    --border:#E3E1D8;
+    --border-strong:#CFCDC2;
+    --text:#222220;
+    --text-2:#5F5E5A;
+    --text-3:#9A988F;
+    --accent:#0F6E56;
+    --accent-bg:#E1F5EE;
+    --accent-text:#085041;
+    --danger:#A32D2D;
+    --danger-bg:#FCEBEB;
+    --warn-bg:#FAEEDA;
+    --warn-text:#633806;
+    --radius-md:8px;
+    --radius-lg:12px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1C1B19;
+      --surface:#252422;
+      --surface-2:#2E2D2A;
+      --border:#3A3935;
+      --border-strong:#4A4945;
+      --text:#EDEBE4;
+      --text-2:#B4B2A9;
+      --text-3:#807E76;
+      --accent:#5DCAA5;
+      --accent-bg:#085041;
+      --accent-text:#9FE1CB;
+      --danger:#F09595;
+      --danger-bg:#501313;
+      --warn-bg:#412402;
+      --warn-text:#FAC775;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--font);
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.6;
+    padding-bottom:4rem;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:1.5rem 1rem;
+  }
+  h1{
+    font-size:20px;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .subtitle{
+    font-size:13px;
+    color:var(--text-2);
+    margin:0 0 1.5rem;
+  }
+  .toolbar{
+    display:flex;
+    gap:8px;
+    margin-bottom:1rem;
+    flex-wrap:wrap;
+  }
+  select, input[type=text], input[type=number], input[type=password]{
+    font-family:var(--font);
+    font-size:14px;
+    color:var(--text);
+    background:var(--surface);
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-md);
+    padding:8px 10px;
+    height:38px;
+    width:100%;
+  }
+  select:focus, input:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 2px var(--accent-bg);
+  }
+  #productSelect{ max-width:280px; flex:1; }
+  button{
+    font-family:var(--font);
+    font-size:13px;
+    color:var(--text);
+    background:var(--surface);
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-md);
+    padding:8px 12px;
+    height:38px;
+    cursor:pointer;
+    white-space:nowrap;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+  }
+  button:hover{ background:var(--surface-2); }
+  button:active{ transform:scale(0.98); }
+  button.primary{
+    background:var(--accent);
+    color:#fff;
+    border-color:var(--accent);
+  }
+  button.danger{ color:var(--danger); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:1rem 1.1rem;
+    margin-bottom:1rem;
+  }
+  .card-label{
+    font-size:13px;
+    color:var(--text-2);
+    margin:0 0 8px;
+  }
+  .field-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .field-row.three{ grid-template-columns:repeat(3,1fr); }
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--text-2);
+    margin-bottom:4px;
+  }
+  .tier-header{
+    display:grid;
+    grid-template-columns:1.5fr 1.2fr 0.8fr 0.7fr 30px;
+    gap:6px;
+    font-size:11px;
+    color:var(--text-3);
+    margin-bottom:6px;
+    padding:0 2px;
+  }
+  .tier-row{
+    display:grid;
+    grid-template-columns:1.5fr 1.2fr 0.8fr 0.7fr 30px;
+    gap:6px;
+    align-items:center;
+    margin-bottom:6px;
+  }
+  .tier-row input, .tier-row select{ height:34px; font-size:13px; padding:6px 8px; }
+  .icon-btn{
+    width:30px;
+    height:34px;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--danger);
+  }
+  .metrics{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:1rem;
+  }
+  .metric{
+    background:var(--surface-2);
+    border-radius:var(--radius-md);
+    padding:0.8rem;
+  }
+  .metric-label{ font-size:12px; color:var(--text-2); margin:0 0 4px; }
+  .metric-value{ font-size:18px; font-weight:600; margin:0; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th, td{ padding:8px 4px; text-align:right; }
+  th:first-child, td:first-child{ text-align:left; }
+  th{ color:var(--text-2); font-weight:500; border-bottom:1px solid var(--border); font-size:12px; }
+  td{ border-bottom:1px solid var(--border); }
+  tr:last-child td{ border-bottom:none; }
+  .final-price{ font-weight:600; }
+  .footer-actions{ display:flex; gap:8px; margin-top:1.5rem; flex-wrap:wrap; align-items:center; }
+  .hint{ font-size:12px; color:var(--text-3); margin-top:6px; }
+  .save-indicator{ font-size:12px; color:var(--accent); margin-left:4px; opacity:0; transition:opacity 0.3s; }
+  .save-indicator.show{ opacity:1; }
+
+  .sync-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px 12px;
+    border-radius:var(--radius-md);
+    margin-bottom:1rem;
+    font-size:13px;
+    flex-wrap:wrap;
+  }
+  .sync-bar.signed-out{ background:var(--warn-bg); color:var(--warn-text); }
+  .sync-bar.signed-in{ background:var(--accent-bg); color:var(--accent-text); }
+  .sync-status{ display:flex; align-items:center; gap:8px; flex:1; min-width:160px; }
+  .sync-actions{ display:flex; gap:8px; align-items:center; }
+  .setup-box{
+    background:var(--surface-2);
+    border-radius:var(--radius-md);
+    padding:0.9rem 1rem;
+    margin-bottom:1rem;
+    font-size:13px;
+  }
+  .setup-box.hidden{ display:none; }
+  .setup-box label{ display:block; font-size:12px; color:var(--text-2); margin:8px 0 4px; }
+  .setup-box .row{ display:flex; gap:8px; align-items:center; }
+
+  @media (max-width:480px){
+    .field-row.three{ grid-template-columns:1fr 1fr; }
+    .metrics{ grid-template-columns:1fr 1fr; }
+    .tier-header{ display:none; }
+    .tier-row{
+      grid-template-columns:1fr;
+      background:var(--surface-2);
+      border-radius:var(--radius-md);
+      padding:8px;
+      margin-bottom:8px;
+    }
+    .icon-btn{ width:100%; justify-content:center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>報價試算工具</h1>
+  <p class="subtitle">成本與各通路層級毛利率／加成率可自由調整，可同步到 Google Drive 跨裝置使用</p>
+
+  <div id="syncBar" class="sync-bar signed-out">
+    <div class="sync-status">
+      <span id="syncStatusText">尚未登入 Google，目前僅在此瀏覽器本機儲存</span>
+    </div>
+    <div class="sync-actions">
+      <button id="setupToggleBtn">設定同步</button>
+      <span id="googleBtnContainer"></span>
+      <button id="signOutBtn" style="display:none;">登出</button>
+    </div>
+  </div>
+
+  <div id="setupBox" class="setup-box hidden">
+    <p style="margin:0 0 6px;"><strong>一次性設定</strong>：貼上你的 Google OAuth Client ID（在 Google Cloud Console 申請，操作說明見對話內容）。設定後會記住，不用每次輸入。</p>
+    <label>Google OAuth Client ID</label>
+    <div class="row">
+      <input type="text" id="clientIdInput" placeholder="xxxxxxxx-xxxxxxxxxxxx.apps.googleusercontent.com" />
+      <button id="saveClientIdBtn" class="primary">儲存</button>
+    </div>
+    <p class="hint" style="margin-top:8px;">這個 ID 不是密碼，只是告訴 Google「這個網頁有被授權使用登入功能」，可以安全地存在這台裝置上。</p>
+  </div>
+
+  <div class="toolbar">
+    <select id="productSelect"></select>
+    <button id="newBtn">新增商品</button>
+    <button id="dupBtn">複製</button>
+    <button id="delBtn" class="danger">刪除</button>
+  </div>
+
+  <div class="card">
+    <div class="field-row">
+      <div class="field">
+        <label>產品型號</label>
+        <input type="text" id="pname" />
+      </div>
+      <div class="field">
+        <label>產品名稱／規格</label>
+        <input type="text" id="pdesc" />
+      </div>
+    </div>
+    <div class="field-row three">
+      <div class="field">
+        <label>未稅成本 (NTD)</label>
+        <input type="number" id="cost" step="0.1" />
+      </div>
+      <div class="field">
+        <label>成本稅率 %</label>
+        <input type="number" id="taxRate" step="0.1" />
+      </div>
+      <div class="field">
+        <label>營業管銷率 %</label>
+        <input type="number" id="opexRate" step="0.1" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">通路層級設定 — 毛利率以「售價」為基礎反推；加成率以「成本」為基礎往上加，依序計算</p>
+    <div class="tier-header">
+      <span>層級名稱</span><span>算法</span><span>比率%</span><span>稅率%</span><span></span>
+    </div>
+    <div id="tiersWrap"></div>
+    <button id="addTierBtn">新增層級</button>
+  </div>
+
+  <div id="resultsWrap"></div>
+
+  <div class="footer-actions">
+    <button id="exportBtn">匯出 CSV</button>
+    <button id="exportAllBtn">備份全部商品 (本機)</button>
+    <button id="importBtn">匯入備份</button>
+    <input type="file" id="importFile" accept=".json" style="display:none;" />
+    <span class="save-indicator" id="saveIndicator">已儲存</span>
+  </div>
+  <p class="hint">登入 Google 後，所有商品資料會存到你 Drive 的 App Data 區（其他應用程式看不到，只有這個工具能讀寫），在任何電腦登入同一帳號都會看到同一份資料。未登入時僅暫存於本機瀏覽器。</p>
+</div>
+
+<script>
+(function(){
+  var STORE_KEY = 'quote_calc_products_v1';
+  var CURRENT_KEY = 'quote_calc_current_v1';
+  var CLIENT_ID_KEY = 'quote_calc_client_id';
+  var DRIVE_FILE_NAME = 'quote_calculator_data.json';
+  var SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+
+  var tokenClient = null;
+  var accessToken = null;
+  var driveFileId = null;
+  var isSignedIn = false;
+  var suppressDriveSave = false;
+
+  function defaultTiers(){
+    return [
+      {id:'t1', name:'特殊商品', mode:'markup', rate:20, taxRate:5},
+      {id:'t2', name:'盤商', mode:'gross', rate:15, taxRate:5},
+      {id:'t3', name:'連鎖通路/門市', mode:'gross', rate:30, taxRate:5},
+      {id:'t4', name:'散客 USER 價', mode:'gross', rate:15, taxRate:5}
+    ];
+  }
+
+  function defaultProduct(name, desc, cost){
+    return {
+      id: 'p' + Date.now() + Math.floor(Math.random()*1000),
+      name: name || '新商品',
+      desc: desc || '',
+      cost: cost != null ? cost : 1000,
+      taxRate: 5,
+      opexRate: 15,
+      tiers: defaultTiers()
+    };
+  }
+
+  function loadLocalState(){
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      var cur = localStorage.getItem(CURRENT_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return { products: parsed, currentId: cur || parsed[0].id };
+        }
+      }
+    } catch(e) {}
+    var sample = defaultProduct('WST-PEX009', 'HDMI2.0 4K/60HZ Extender, POC, 70M', 1820);
+    return { products: [sample], currentId: sample.id };
+  }
+
+  var state = loadLocalState();
+  var products = state.products;
+  var currentId = state.currentId;
+
+  function fmt(n){
+    if (!isFinite(n)) return '0.0';
+    return Number(n).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1});
+  }
+
+  function getCurrent(){
+    var found = products.find(function(p){ return p.id === currentId; });
+    if (found) return found;
+    currentId = products[0].id;
+    return products[0];
+  }
+
+  function calc(product){
+    var costUntaxed = product.cost;
+    var costTaxed = costUntaxed * (1 + product.taxRate/100);
+    var opexTotal = costTaxed * (product.opexRate/100);
+    var baseUntaxed = costUntaxed + opexTotal / (1 + product.taxRate/100);
+
+    var rows = [];
+    var prevUntaxed = baseUntaxed;
+
+    product.tiers.forEach(function(tier){
+      var thisUntaxed, thisTaxed;
+      if (tier.mode === 'markup'){
+        thisUntaxed = prevUntaxed * (1 + tier.rate/100);
+      } else {
+        var r = tier.rate/100;
+        thisUntaxed = r < 1 ? prevUntaxed / (1 - r) : prevUntaxed * 2;
+      }
+      thisTaxed = thisUntaxed * (1 + tier.taxRate/100);
+      var marginRate = thisUntaxed > 0 ? (thisUntaxed - prevUntaxed) / thisUntaxed * 100 : 0;
+      var markupRate = prevUntaxed > 0 ? (thisUntaxed - prevUntaxed) / prevUntaxed * 100 : 0;
+
+      rows.push({
+        name: tier.name, mode: tier.mode, inputRate: tier.rate,
+        untaxed: thisUntaxed, taxed: thisTaxed,
+        marginRate: marginRate, markupRate: markupRate
+      });
+      prevUntaxed = thisUntaxed;
+    });
+
+    return { costUntaxed: costUntaxed, costTaxed: costTaxed, opexTotal: opexTotal, baseUntaxed: baseUntaxed, rows: rows };
+  }
+
+  function renderProductSelect(){
+    var sel = document.getElementById('productSelect');
+    sel.innerHTML = '';
+    products.forEach(function(p){
+      var opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name + (p.desc ? ' — ' + p.desc.slice(0,24) : '');
+      if (p.id === currentId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function renderFields(){
+    var p = getCurrent();
+    document.getElementById('pname').value = p.name;
+    document.getElementById('pdesc').value = p.desc;
+    document.getElementById('cost').value = p.cost;
+    document.getElementById('taxRate').value = p.taxRate;
+    document.getElementById('opexRate').value = p.opexRate;
+  }
+
+  function renderTiers(){
+    var p = getCurrent();
+    var wrap = document.getElementById('tiersWrap');
+    wrap.innerHTML = '';
+    p.tiers.forEach(function(tier, idx){
+      var row = document.createElement('div');
+      row.className = 'tier-row';
+
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = tier.name;
+      nameInput.placeholder = '層級名稱';
+      nameInput.addEventListener('input', function(){ tier.name = nameInput.value; renderProductSelect(); renderResults(); persist(); });
+
+      var modeSelect = document.createElement('select');
+      var optGross = document.createElement('option');
+      optGross.value = 'gross'; optGross.textContent = '毛利率(售價)';
+      var optMarkup = document.createElement('option');
+      optMarkup.value = 'markup'; optMarkup.textContent = '加成率(成本)';
+      modeSelect.appendChild(optGross);
+      modeSelect.appendChild(optMarkup);
+      modeSelect.value = tier.mode;
+      modeSelect.addEventListener('change', function(){ tier.mode = modeSelect.value; renderResults(); persist(); });
+
+      var rateInput = document.createElement('input');
+      rateInput.type = 'number';
+      rateInput.step = '0.1';
+      rateInput.value = tier.rate;
+      rateInput.addEventListener('input', function(){ tier.rate = parseFloat(rateInput.value) || 0; renderResults(); persist(); });
+
+      var taxInput = document.createElement('input');
+      taxInput.type = 'number';
+      taxInput.step = '0.1';
+      taxInput.value = tier.taxRate;
+      taxInput.title = '此層級稅率%';
+      taxInput.addEventListener('input', function(){ tier.taxRate = parseFloat(taxInput.value) || 0; renderResults(); persist(); });
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', function(){
+        p.tiers.splice(idx, 1);
+        renderTiers(); renderResults(); persist();
+      });
+
+      row.appendChild(nameInput);
+      row.appendChild(modeSelect);
+      row.appendChild(rateInput);
+      row.appendChild(taxInput);
+      row.appendChild(delBtn);
+      wrap.appendChild(row);
+    });
+  }
+
+  function renderResults(){
+    var p = getCurrent();
+    var c = calc(p);
+    var wrap = document.getElementById('resultsWrap');
+    wrap.innerHTML = '';
+
+    var metrics = document.createElement('div');
+    metrics.className = 'metrics';
+    function metricCard(label, value){
+      var d = document.createElement('div');
+      d.className = 'metric';
+      d.innerHTML = '<p class="metric-label">' + label + '</p><p class="metric-value">' + value + '</p>';
+      return d;
+    }
+    metrics.appendChild(metricCard('未稅成本', 'NT$' + fmt(c.costUntaxed)));
+    metrics.appendChild(metricCard('含稅成本', 'NT$' + fmt(c.costTaxed)));
+    metrics.appendChild(metricCard('管銷後底價(未稅)', 'NT$' + fmt(c.baseUntaxed)));
+    wrap.appendChild(metrics);
+
+    var card = document.createElement('div');
+    card.className = 'card';
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>層級</th><th>未稅價</th><th>含稅價</th><th>毛利率</th><th>加成率</th></tr>';
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    c.rows.forEach(function(r, i){
+      var tr = document.createElement('tr');
+      var isLast = i === c.rows.length - 1;
+      tr.innerHTML = '<td>' + r.name + '</td><td>' + fmt(r.untaxed) + '</td>' +
+        '<td class="' + (isLast ? 'final-price' : '') + '">' + fmt(r.taxed) + '</td>' +
+        '<td>' + r.marginRate.toFixed(1) + '%</td><td>' + r.markupRate.toFixed(1) + '%</td>';
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    card.appendChild(table);
+    wrap.appendChild(card);
+  }
+
+  function render(){
+    renderProductSelect();
+    renderFields();
+    renderTiers();
+    renderResults();
+  }
+
+  function flashSaved(text){
+    var ind = document.getElementById('saveIndicator');
+    ind.textContent = text || '已儲存';
+    ind.classList.add('show');
+    clearTimeout(window._saveTimer);
+    window._saveTimer = setTimeout(function(){ ind.classList.remove('show'); }, 1500);
+  }
+
+  function persist(){
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(products));
+      localStorage.setItem(CURRENT_KEY, currentId);
+    } catch(e) {}
+    if (isSignedIn && accessToken) {
+      saveToDrive();
+    } else {
+      flashSaved('已儲存（本機）');
+    }
+  }
+
+  document.getElementById('productSelect').addEventListener('change', function(e){ currentId = e.target.value; render(); persist(); });
+  document.getElementById('pname').addEventListener('input', function(e){ getCurrent().name = e.target.value; renderProductSelect(); persist(); });
+  document.getElementById('pdesc').addEventListener('input', function(e){ getCurrent().desc = e.target.value; renderProductSelect(); persist(); });
+  document.getElementById('cost').addEventListener('input', function(e){ getCurrent().cost = parseFloat(e.target.value) || 0; renderResults(); persist(); });
+  document.getElementById('taxRate').addEventListener('input', function(e){ getCurrent().taxRate = parseFloat(e.target.value) || 0; renderResults(); persist(); });
+  document.getElementById('opexRate').addEventListener('input', function(e){ getCurrent().opexRate = parseFloat(e.target.value) || 0; renderResults(); persist(); });
+
+  document.getElementById('addTierBtn').addEventListener('click', function(){
+    getCurrent().tiers.push({id:'t'+Date.now(), name:'新層級', mode:'gross', rate:15, taxRate:5});
+    renderTiers(); renderResults(); persist();
+  });
+
+  document.getElementById('newBtn').addEventListener('click', function(){
+    var np = defaultProduct('新商品', '', 1000);
+    products.push(np); currentId = np.id; render(); persist();
+  });
+
+  document.getElementById('dupBtn').addEventListener('click', function(){
+    var p = getCurrent();
+    var copy = JSON.parse(JSON.stringify(p));
+    copy.id = 'p' + Date.now();
+    copy.name = p.name + ' (複製)';
+    products.push(copy); currentId = copy.id; render(); persist();
+  });
+
+  document.getElementById('delBtn').addEventListener('click', function(){
+    if (products.length <= 1) { alert('至少需保留一個商品'); return; }
+    if (!confirm('確定要刪除「' + getCurrent().name + '」嗎？')) return;
+    var idx = products.findIndex(function(p){ return p.id === currentId; });
+    products.splice(idx, 1);
+    currentId = products[0].id;
+    render(); persist();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    var p = getCurrent();
+    var c = calc(p);
+    var lines = [];
+    lines.push('產品型號,' + p.name);
+    lines.push('產品名稱,' + p.desc);
+    lines.push('未稅成本,' + fmt(c.costUntaxed));
+    lines.push('含稅成本,' + fmt(c.costTaxed));
+    lines.push('營業管銷率,' + p.opexRate + '%');
+    lines.push('管銷後底價(未稅),' + fmt(c.baseUntaxed));
+    lines.push('');
+    lines.push('層級,算法,輸入比率%,未稅價,含稅價,毛利率%,加成率%');
+    c.rows.forEach(function(r){
+      lines.push([r.name, r.mode==='markup'?'加成率':'毛利率', r.inputRate, fmt(r.untaxed), fmt(r.taxed), r.marginRate.toFixed(1), r.markupRate.toFixed(1)].join(','));
+    });
+    downloadFile(new Blob(['\ufeff' + lines.join('\n')], {type: 'text/csv;charset=utf-8;'}), (p.name || 'quote') + '.csv');
+  });
+
+  document.getElementById('exportAllBtn').addEventListener('click', function(){
+    var json = JSON.stringify({products: products, currentId: currentId}, null, 2);
+    downloadFile(new Blob([json], {type: 'application/json;charset=utf-8;'}), 'quote_backup_' + todayStr() + '.json');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function(){ document.getElementById('importFile').click(); });
+  document.getElementById('importFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt){
+      try {
+        var data = JSON.parse(evt.target.result);
+        if (data && Array.isArray(data.products) && data.products.length > 0) {
+          if (confirm('匯入將覆蓋目前所有商品資料，確定要繼續嗎？')) {
+            products = data.products;
+            currentId = data.currentId || products[0].id;
+            render(); persist();
+          }
+        } else { alert('檔案格式不正確'); }
+      } catch(err) { alert('讀取失敗：' + err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  function downloadFile(blob, filename){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  document.getElementById('setupToggleBtn').addEventListener('click', function(){
+    var box = document.getElementById('setupBox');
+    box.classList.toggle('hidden');
+    if (!box.classList.contains('hidden')) {
+      document.getElementById('clientIdInput').value = localStorage.getItem(CLIENT_ID_KEY) || '';
+    }
+  });
+
+  document.getElementById('saveClientIdBtn').addEventListener('click', function(){
+    var val = document.getElementById('clientIdInput').value.trim();
+    if (!val) { alert('請輸入 Client ID'); return; }
+    localStorage.setItem(CLIENT_ID_KEY, val);
+    document.getElementById('setupBox').classList.add('hidden');
+    initGoogle();
+    flashSaved('Client ID 已儲存');
+  });
+
+  function updateSyncBar(){
+    var bar = document.getElementById('syncBar');
+    var text = document.getElementById('syncStatusText');
+    var signOutBtn = document.getElementById('signOutBtn');
+    var googleBtnContainer = document.getElementById('googleBtnContainer');
+    if (isSignedIn) {
+      bar.className = 'sync-bar signed-in';
+      text.textContent = '已登入 Google，資料同步中';
+      signOutBtn.style.display = 'inline-flex';
+      googleBtnContainer.innerHTML = '';
+    } else {
+      bar.className = 'sync-bar signed-out';
+      var clientId = localStorage.getItem(CLIENT_ID_KEY);
+      text.textContent = clientId ? '尚未登入 Google，目前僅在此瀏覽器本機儲存' : '尚未設定同步，請先點「設定同步」';
+      signOutBtn.style.display = 'none';
+    }
+  }
+
+  function initGoogle(){
+    var clientId = localStorage.getItem(CLIENT_ID_KEY);
+    if (!clientId || typeof google === 'undefined' || !google.accounts) { updateSyncBar(); return; }
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: function(resp){
+        if (resp && resp.access_token) {
+          accessToken = resp.access_token;
+          isSignedIn = true;
+          updateSyncBar();
+          loadFromDrive();
+        }
+      }
+    });
+    renderGoogleButton();
+  }
+
+  function renderGoogleButton(){
+    var container = document.getElementById('googleBtnContainer');
+    container.innerHTML = '';
+    if (isSignedIn) return;
+    var btn = document.createElement('button');
+    btn.className = 'primary';
+    btn.textContent = '登入 Google 同步';
+    btn.addEventListener('click', function(){
+      if (tokenClient) tokenClient.requestAccessToken();
+    });
+    container.appendChild(btn);
+  }
+
+  document.getElementById('signOutBtn').addEventListener('click', function(){
+    if (accessToken && google && google.accounts && google.accounts.oauth2) {
+      google.accounts.oauth2.revoke(accessToken, function(){});
+    }
+    accessToken = null;
+    isSignedIn = false;
+    driveFileId = null;
+    updateSyncBar();
+    renderGoogleButton();
+  });
+
+  function driveApi(path, opts){
+    opts = opts || {};
+    var headers = Object.assign({ 'Authorization': 'Bearer ' + accessToken }, opts.headers || {});
+    return fetch(path, Object.assign({}, opts, { headers: headers }));
+  }
+
+  function findDriveFile(){
+    return driveApi('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name)&q=' + encodeURIComponent("name='" + DRIVE_FILE_NAME + "'"))
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (data.files && data.files.length > 0) return data.files[0].id;
+        return null;
+      });
+  }
+
+  function createDriveFile(content){
+    var metadata = { name: DRIVE_FILE_NAME, parents: ['appDataFolder'] };
+    var boundary = 'quotecalcboundary';
+    var body = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) + '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' +
+      content + '\r\n--' + boundary + '--';
+    return driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+      body: body
+    }).then(function(r){ return r.json(); }).then(function(data){ return data.id; });
+  }
+
+  function updateDriveFile(fileId, content){
+    return driveApi('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: content
+    });
+  }
+
+  function loadFromDrive(){
+    flashSaved('讀取雲端資料中...');
+    findDriveFile().then(function(fileId){
+      if (!fileId) {
+        driveFileId = null;
+        return saveToDrive();
+      }
+      driveFileId = fileId;
+      return driveApi('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if (data && Array.isArray(data.products) && data.products.length > 0) {
+            suppressDriveSave = true;
+            products = data.products;
+            currentId = data.currentId || products[0].id;
+            try {
+              localStorage.setItem(STORE_KEY, JSON.stringify(products));
+              localStorage.setItem(CURRENT_KEY, currentId);
+            } catch(e) {}
+            render();
+            suppressDriveSave = false;
+            flashSaved('雲端資料已載入');
+          } else {
+            saveToDrive();
+          }
+        });
+    }).catch(function(err){
+      flashSaved('雲端讀取失敗');
+      console.error(err);
+    });
+  }
+
+  function saveToDrive(){
+    if (suppressDriveSave) return;
+    if (!accessToken) return;
+    var content = JSON.stringify({ products: products, currentId: currentId });
+    var task = driveFileId ? updateDriveFile(driveFileId, content) : createDriveFile(content).then(function(id){ driveFileId = id; });
+    task.then(function(){ flashSaved('已同步到雲端'); }).catch(function(err){
+      flashSaved('同步失敗');
+      console.error(err);
+    });
+  }
+
+  initGoogle();
+  render();
+  updateSyncBar();
+})();
+</script>
+</body>
+</html>
